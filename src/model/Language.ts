@@ -1,0 +1,127 @@
+import { existsSync, readFileSync } from "fs";
+import path from "path";
+import { sprintf } from "sprintf-js";
+
+import rng from "seedrandom";
+import App from "../controller/App";
+
+const LanguagesDir = path.resolve(__dirname, "../data/languages");
+
+export default class Language {
+    /**
+     * The language code
+     * Defaults to the filename
+     */
+    public code: string;
+
+    /**
+     * The language words
+     */
+    public words: string[];
+
+    /**
+     * The language information / data
+     */
+    public data: {
+        id: string,
+        name: string,
+        words: string,
+        messages: Record<string, string | string[]>
+    };
+
+    constructor(code: string = null) {
+        if (code !== null) {
+            this.code = code;
+        }
+
+        if (this.code === null) {
+            this.code = path.basename(__filename, "js");
+        }
+
+        let languageFile = path.resolve(LanguagesDir, this.code + ".json");
+
+        // If the language file doesn't exists
+        if (!existsSync(languageFile)) {
+            // Defaults to pt_BR for now
+            // @todo make it default to en_US later
+            languageFile = path.resolve(LanguagesDir, "pt_BR.json");
+        }
+
+        // Try loading the language file
+        try {
+            this.data = JSON.parse(
+                readFileSync(
+                    languageFile,
+                    "utf-8"
+                )
+            );
+        } catch(e) {
+            App.Instance().logger.error("Failed to load language %s", this.code);
+            throw e;
+        }
+
+        // Load the language words file
+        this.words = readFileSync(
+            path.resolve(LanguagesDir, this.data.words),
+            "utf-8"
+        )
+            .split("\n")
+            .map((word) => word.trim())
+            .filter((word, index, arr) => {
+                // If the word length is invalid
+                if (word.length !== 5) {
+                    App.Instance().logger.warn("word %s has a length different than 5", word);
+                    return false;
+                }
+
+                // If the word is repeated
+                if (arr.indexOf(word) !== index) {
+                    App.Instance().logger.warn("word %s is repeated", word);
+                    return false;
+                }
+
+                return true;
+            })
+    }
+
+    /**
+     * Checks if a word is present in the language dictionary
+     * @param word The word to be checked
+     * @returns 
+     */
+    public isWordPresent(word: string) {
+        return this.words.includes(word);
+    }
+
+    /**
+     * Retrieves a single message
+     * @param index The message index to be retrieved
+     * @returns 
+     */
+    public getMessage(index: string, ...args: (string | number)[]) {
+        let message = this.data.messages[index];
+
+        if (Array.isArray(message)) {
+            message = message.join("\n");
+        }
+
+        return sprintf(message as string, ...args);
+    }
+
+    /**
+     * Retrieves a random word from this language dictionary
+     * @returns 
+     */
+    public getRandomWord(): string {
+        return this.words[Math.round(Math.random() * this.words.length)];
+    }
+
+    /**
+     * Retrieves the daily word from this language dictionary
+     * @returns
+     */
+    public getDailyWord(): string {
+        const prng = rng(new Date().toDateString());
+        return this.words[Math.floor(prng() * (this.words.length - 1))];
+    }
+}

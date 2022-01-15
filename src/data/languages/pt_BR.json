@@ -1,0 +1,22 @@
+{
+    "id": "pt_BR",
+    "name": "Português do Brasil",
+    "words": "dictionary/pt_BR.dictionary",
+    "messages": {
+        "help": [
+            "<b>Ajuda</b>\n",
+            "<b>/start [tipo]</b> - Inicia uma nova partida. Caso seja especificado um tipo, será iniciada uma partida do tipo requisitado.",
+            "<b>/help</b> - Exibe esta lista de informações."
+        ],
+        "game.error.already_running": "⚠️ <b>Este chat já tem um jogo em andamento.</b>",
+        "game.start": [
+            "Descubra a palavra em <b>6</b> tentativas.\n",
+            "Após cada tentativa, a cor dos blocos irá se alterar para exibir o quão próximo você estava da palavra."
+        ],
+        "game.tries": "<b>%d</b> tentativas restantes",
+        "game.answer_this_to_play": "<i>Resposta à <b>esta mensagem</b> para jogar.</i>",
+        "game.error.word_not_present": "A palavra <i>%s</i> não está presente no dicionário.",
+        "game.error.length_not_equal": "A palavra deve conter exatamente <i>%d letras</d>.",
+        "game.win": "✅ <b>Parabéns, %s acertou!</b>\nA palavra era <b>%s</b>"
+    }
+}
