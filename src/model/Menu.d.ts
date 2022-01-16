@@ -24,12 +24,12 @@ interface OptionType<TMenu extends MenuModel> {
     text: OptionalLanguageText
 }
 
-interface OptionTypeWithGetter<TMenu extends MenuModel, TGetterType> extends OptionType<TMenu> {
-    get: (menu: TMenu) => TGetterType
-}
-
-interface OptionTypeWithGetterAndSetter<TMenu extends MenuModel, TValueType> extends OptionTypeWithGetter<TMenu, TValueType> {
-    set: (value: TValueType, menu: TMenu) => Promise<any>
+interface OptionTypeWithGetterAndSetter<
+    TMenu extends MenuModel,
+    TValueType extends string | boolean | number | any[]
+> extends OptionType<TMenu> {
+    get: (menu: TMenu) => TValueType | Promise<TValueType>,
+    set: (value: TValueType, menu: TMenu) => boolean | Promise<any>
 }
 
 /**
@@ -56,7 +56,7 @@ interface NumberOptionType<TMenu extends MenuModel> extends OptionTypeWithGetter
 /**
  * Represents the selection option type
  */
-interface SelectOptionType<TMenu extends MenuModel, TType> extends OptionTypeWithGetterAndSetter<TMenu, TType> {
+interface SelectOptionType<TMenu extends MenuModel, TType extends string | number> extends OptionTypeWithGetterAndSetter<TMenu, TType> {
     type: "select",
     options: {
         text: string,

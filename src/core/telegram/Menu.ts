@@ -1,25 +1,8 @@
 import { Extra } from "telegraf";
 import App, { AppBotContext } from "../../controller/App";
-import MenuModel, { MenuOption } from "../../model/Menu";
-
-/**
- * Represents a Telegram inline-keyboard option
- */
-export class TelegramMenuOption extends MenuOption<TelegramMenu> {
-    /**
-     * Retrieves the text for a given button / action
-     * @returns 
-     */
-    public getText(): string {
-        if (typeof this.text === "symbol") {
-            return this.menu.context.relatedChat.getLanguage().getMessage(
-                (this.text as Symbol).description as string
-            );
-        }
-
-        return this.text as string;
-    }
-}
+import { GetChatForContext } from "../../controller/Game";
+import MenuModel from "../../model/Menu";
+import TelegramMenuOption from "./menu/MenuOption";
 
 export default class TelegramMenu extends MenuModel {
     public static build<T = TelegramMenu>(
@@ -85,7 +68,7 @@ export default class TelegramMenu extends MenuModel {
      * @returns 
      */
     public getMarkup() {
-        return Extra.markup((m) => 
+        return Extra.HTML(true).markup((m) => 
             m.inlineKeyboard(
                 this.options.map((option) => 
                     option.forMenu<TelegramMenu, TelegramMenuOption>(this)
@@ -114,12 +97,15 @@ export default class TelegramMenu extends MenuModel {
             app.logger.debug("registered action %s", optionId);
 
             // When this action is executed
-            app.bot.action(optionId, async (context) => {
+            app.bot.action(optionId, GetChatForContext(true), async (context) => {
                 app.logger.debug("received callback action %s", optionId);
 
                 await context.answerCbQuery();
 
                 app.logger.debug("answered action %s", optionId);
+
+                this.context = context;
+                option.update(this, context);
             });
         });
     }

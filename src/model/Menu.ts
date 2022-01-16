@@ -7,30 +7,32 @@ export class MenuOption<T extends MenuModel> {
         return Symbol.for(message);
     }
 
-    public type: string;
-    public text: OptionalLanguageText;
-    public id: string;
-
     constructor(
         /**
          * The option data
          */
-        option: OptionTypes<T>,
+        public option: OptionTypes<T>,
 
         protected menu?: T
     ) {
-        this.id = option.id;
-        this.type = option.type;
-        this.text = option.text;
+
+    }
+
+    public get id() {
+        return this.option.id;
+    }
+
+    public get type() {
+        return this.option.type;
+    }
+
+    public get text() {
+        return this.option.text;
     }
 
     public forMenu<M extends MenuModel, J extends MenuOption<T>>(menu: M): J {
         // @ts-ignore
-        return new this.constructor({
-            id: this.id,
-            type: this.type,
-            text: this.text
-        }, menu);
+        return new this.constructor(this.option, menu);
     }
 }
 
