@@ -1,7 +1,8 @@
 import { Context } from "telegraf";
 import { Message, ReplyMessage } from "telegraf/typings/telegram-types";
 import App, { AppBotContext } from "../controller/App";
-import Language from "./Language";
+import Chat from "../controller/tables/Chat";
+import Language, { LanguageWord } from "./Language";
 
 export enum GameModes {
     WORD_OF_THE_DAY,
@@ -33,12 +34,12 @@ export default class GameModel {
     /**
      * The language related to this game
      */
-    public language: Language = new Language("pt_BR");
+    public language: Language;
 
     /**
      * The game word
      */
-    public word: string;
+    public word: LanguageWord;
 
     /**
      * The game message that user will need to reply to
@@ -59,20 +60,37 @@ export default class GameModel {
         /**
          * The chat where the game is ocurring
          */
-        private chat: Context,
+        private context: Context,
 
         /**
          * The application instance related to this game
          */
-        protected app: App
+        protected app: App,
+
+        /**
+         * The chat where the game is ocurring
+         */
+        protected chat: Chat
     ) {
+        
+    }
+
+    /**
+     * Initializes the game
+     */
+    public async init() {
+        this.language = new Language(this.chat.languageId);
+
+        // Initialize the language
+        await this.language.init();
+
         if (this.mode === GameModes.WORD_OF_THE_DAY) {
             this.word = this.language.getDailyWord();
         } else {
             this.word = this.language.getRandomWord();
         }
 
-        this.app.logger.info("new game started, word is %s", this.word);
+        this.app.logger.info("new game started, word is %s and difficulty is %d", this.word.originalWord, this.word.difficulty);
     }
 
     /**
@@ -82,17 +100,6 @@ export default class GameModel {
      */
     public isForMessage(message: ReplyMessage) {
         return this.message && message.message_id === this.message.message_id;
-    }
-
-    /**
-     * Starts a new game
-     */
-    public start() {
-        this.chat.replyWithHTML(
-            this.language.getMessage("game.start")
-        );
-
-        return this.sendProgress();
     }
 
     /**
@@ -108,6 +115,21 @@ export default class GameModel {
     }
 
     /**
+     * Starts a new game
+     */
+    public start() {
+        return this.init()
+        .then(() => {
+            return this.context.replyWithHTML(
+                this.language.getMessage("game.start")
+            );
+        })
+        .then(() => {
+            return this.sendProgress();
+        });
+    }
+
+    /**
      * Processes the game with a given context message
      * @param ctx The sent message context to be processed
      * @returns 
@@ -115,18 +137,17 @@ export default class GameModel {
     public process(ctx: AppBotContext) {
         // Parse the word
         const word = this.parseWordForChecking(ctx.message.text);
-        const parsedWord = this.parseWordForChecking(this.word);
 
         let error: GameError = null;
 
         // If the word length differs
-        if (word.length !== parsedWord.length) {
-            this.app.logger.debug("given length %d is different than word length %d", word.length, parsedWord.length);
+        if (word.length !== this.word.word.length) {
+            this.app.logger.debug("given length %d is different than word length %d", word.length, this.word.word.length);
 
             error = {
                 deleteMessage: true,
                 icon: "❌",
-                text: this.language.getMessage("game.error.length_not_equal", parsedWord.length)
+                text: this.language.getMessage("game.error.length_not_equal", this.word.word.length)
             };
         } else
         // Check if the given word belongs to the dictionary
@@ -155,7 +176,7 @@ export default class GameModel {
         this.replies.push(ctx.message);
 
         // Check if the word are equals
-        if (word === this.parseWordForChecking(parsedWord)) {
+        if (word === this.word.word) {
             return this.end(ctx);
         }
 
@@ -164,11 +185,11 @@ export default class GameModel {
 
         for(let l = 0; l < word.length; l++) {
             // If the letter is at the right place
-            if (parsedWord[l] === word[l]) {
+            if (this.word.word[l] === word[l]) {
                 matches.push("🟩");
             } else
             // If the letter is at the wrong place
-            if (parsedWord.includes(word[l])) {
+            if (this.word.word.includes(word[l])) {
                 matches.push("🟨");
             } else {
                 // If the letter doesn't exists
@@ -192,10 +213,10 @@ export default class GameModel {
 
         this.app.logger.debug("%s won the game", ctx.message.from.username);
 
-        this.tries.push("🟩".repeat(this.word.length));
+        this.tries.push("🟩".repeat(this.word.word.length));
 
         return this.sendProgress(
-            this.language.getMessage("game.win", ctx.message.from.username, this.word)
+            this.language.getMessage("game.win", ctx.message.from.username, this.word.originalWord)
         )
             .then(() => {
                 // Delete all replies
@@ -223,7 +244,13 @@ export default class GameModel {
         const remaniningTries = this.maxTries - this.tries.length;
 
         if (!this.ended) {
-            msg.push(this.language.getMessage("game.answer_this_to_play"));
+            msg.push(
+                this.language.getMessage(
+                    "game.answer_this_to_play",
+                    "🟩".repeat(this.word.difficulty) + "⬛".repeat(this.word.difficulty - 5)
+                )
+            );
+
             msg.push(this.language.getMessage("game.tries", remaniningTries));
             msg.push("");
         }
@@ -235,7 +262,7 @@ export default class GameModel {
 
         // Print out the remaining tries
         for(let i = 0; i < remaniningTries; i++) {
-            msg.push("⬜️".repeat(this.word.length));
+            msg.push("⬜️".repeat(this.word.word.length));
         }
 
         if (footer) {
@@ -244,7 +271,7 @@ export default class GameModel {
 
         if (this.message) {
             return this.app.telegram.editMessageText(
-                this.chat.chat.id,
+                this.context.chat.id,
                 this.message.message_id,
                 null,
                 msg.join("\n"),
@@ -256,7 +283,7 @@ export default class GameModel {
                 return this.message;
             })
         } else {
-            return this.chat.replyWithHTML(msg.join("\n"))
+            return this.context.replyWithHTML(msg.join("\n"))
             .then((msg) => {
                 this.message = msg;
 

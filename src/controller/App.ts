@@ -1,13 +1,18 @@
 import { createServer } from "http";
-import { Context, Telegraf, Telegram } from "telegraf";
+import { Context, Middleware, Telegraf, Telegram } from "telegraf";
 import { MessageEntity } from "telegraf/typings/telegram-types";
 import { createLogger, format, transports } from "winston";
 
-import Bot from "./Bot";
+import GameController from "./Game";
+import EditorController from "./Editor";
+import Database from "./Database";
+import BotSettingsTable from "./tables/BotSettings";
+import Chat from "./tables/Chat";
 
 export interface AppBotContext extends Context {
     getMessage(): string,
-    getArguments(): string[]
+    getArguments(): string[],
+    relatedChat: Chat
 }
 
 export default class App {
@@ -25,17 +30,40 @@ export default class App {
         return this.INSTANCE;
     }
 
+    /**
+     * The port where the agent will run
+     */
     private port = process.env.PORT || 3000;
+
+    /**
+     * If the application is in debug mode
+     */
+    public debug: boolean = process.env.NODE_ENV !== "production";
 
     public telegram: Telegram = new Telegram(process.env.BOT_TOKEN);
 
-    public bot: typeof Telegraf & {
+    public bot: Telegraf<AppBotContext> & {
         context: AppBotContext,
-        on: (event: string, callback: (context: AppBotContext) => any) => any
+        //on: (event: string, ...middlewares: ReadonlyArray<Middleware<AppBotContext>>) => any
     } = new Telegraf(process.env.BOT_TOKEN) as any;
 
+    /**
+     * The application database instance
+     */
+    public db = new Database(this);
+
+    /**
+     * The application settings
+     */
+    public settings: {
+        /**
+         * A list of accounts that moderate the bot
+         */
+        modAccounts?: string[]
+    } = {};
+
     public logger = createLogger({
-        level: process.env.NODE_ENV !== "production" ? "debug" : "info",
+        level: this.debug ? "debug" : "info",
         format: format.combine(
             // Applies colors to the messages
             format.colorize(),
@@ -66,19 +94,42 @@ export default class App {
         this.init();
     }
 
-    init() {
-        return this.createHttpServer()
+    /**
+     * Initializes the application
+     * @returns 
+     */
+    private init() {
+        this.logger.info("connecting to the database...");
+
+        return this.db.init()
         .then(() => {
-            this.logger.info("listening at %s", "http://localhost:" + this.port);
+            this.logger.info("connected to the database");
+            this.logger.info("updating application settings...");
+
+            return this.updateApplicationSettings();
+        })
+        .then(() => {
+            this.logger.info("application settings was updated");
+            this.logger.info("starting up the HTTP server...");
+
+            return this.createHttpServer();
+        })
+        .then(() => {
+            this.logger.info("agent listening at %s", "http://localhost:" + this.port);
 
             return this.createTelegramBot();
         })
         .then(() => {
-            Bot(this);
+            GameController(this);
+            EditorController(this);
         });
     }
     
-    createHttpServer() {
+    /**
+     * Creates the application HTTP server
+     * @returns 
+     */
+    private createHttpServer() {
         return new Promise<void>((resolve) => {
             // Start a fake HTTP server
             createServer((req, res) => {
@@ -86,14 +137,18 @@ export default class App {
                     "Content-Type": "text/html"
                 });
 
-                res.write(`<html><body>WordleBot is Running</body></html>`);
+                res.write(`<html><body>WordIn server is Running</body></html>`);
 
                 res.end();
             }).listen(this.port, resolve);
         });
     }
 
-    createTelegramBot() {
+    /**
+     * Creates the application Telegraft instance
+     * @returns 
+     */
+    private createTelegramBot() {
         /**
          * Retrieves the context text message
          * 
@@ -128,10 +183,40 @@ export default class App {
         // @ts-ignore
         this.bot.launch({
             polling: {
-                allowedUpdates: ["message"]
+                allowedUpdates: ["message", "callback_query"]
             }
         });
 
+        // Enable graceful stop
+        process.once("SIGINT", () => this.bot.stop());
+        process.once("SIGTERM", () => this.bot.stop());
+
         return Promise.resolve();
+    }
+
+    /**
+     * Updates the bot settings
+     * @returns
+     */
+    private updateApplicationSettings() {
+        return BotSettingsTable.findAll()
+        .then((options) => {
+            options.forEach((option) => {
+                let value = option.value;
+
+                try {
+                    value = JSON.parse(value);
+                } catch(e) {
+
+                }
+
+                // @ts-ignore
+                this.settings[option.key] = value;
+            });
+
+            this.logger.debug("application settings were updated: %O", this.settings);
+
+            return true;
+        });
     }
 }

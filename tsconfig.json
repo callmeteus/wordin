@@ -4,9 +4,12 @@
       "noImplicitAny": true,
       "removeComments": true,
       "preserveConstEnums": true,
+      "experimentalDecorators": true,
       "sourceMap": true,
-      "esModuleInterop": true
+      "esModuleInterop": true,
+      "target": "esnext",
+      "typeRoots": ["./node_modules/@types/", "./src/types.d.ts"]
     },
     "include": ["src/**/*.ts"],
-    "files": ["src/**/*.ts"]
+    "files": ["src/**/*.ts", "src/types.d.ts"]
 }

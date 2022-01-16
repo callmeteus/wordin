@@ -1,11 +1,32 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { sprintf } from "sprintf-js";
 
 import rng from "seedrandom";
 import App from "../controller/App";
+import LanguageTable from "../controller/tables/Language";
 
 const LanguagesDir = path.resolve(__dirname, "../data/languages");
+
+/**
+ * Represents a word inside a dictionary
+ */
+export interface LanguageWord {
+    /**
+     * The parsed word
+     */
+    word: string,
+
+    /**
+     * The original unparsed world
+     */
+    originalWord?: string,
+
+    /**
+     * The word difficulty
+     */
+    difficulty: number
+}
 
 export default class Language {
     /**
@@ -17,7 +38,7 @@ export default class Language {
     /**
      * The language words
      */
-    public words: string[];
+    public words: LanguageWord[];
 
     /**
      * The language information / data
@@ -37,7 +58,30 @@ export default class Language {
         if (this.code === null) {
             this.code = path.basename(__filename, "js");
         }
+    }
 
+    /**
+     * Initializes the language
+     * @returns 
+     */
+    public init() {
+        return LanguageTable.findOne({
+            where: {
+                id: ""
+            }
+        })
+        .then((data) => {
+            if (!data) {
+                return this.initFromDisk();
+            }
+
+            this.data = data.toJSON();
+
+            return this.data;
+        });
+    }
+
+    public initFromDisk() {
         let languageFile = path.resolve(LanguagesDir, this.code + ".json");
 
         // If the language file doesn't exists
@@ -60,28 +104,49 @@ export default class Language {
             throw e;
         }
 
-        // Load the language words file
-        this.words = readFileSync(
-            path.resolve(LanguagesDir, this.data.words),
-            "utf-8"
-        )
-            .split("\n")
-            .map((word) => word.trim())
-            .filter((word, index, arr) => {
-                // If the word length is invalid
-                if (word.length !== 5) {
-                    App.Instance().logger.warn("word %s has a length different than 5", word);
-                    return false;
-                }
+        // Check if it's a JSON dictionary
+        if (path.extname(languageFile) === ".json") {
+            this.words = JSON.parse(readFileSync(path.resolve(LanguagesDir, this.data.words), "utf-8"));
+        } else {
+            // Load the language words file
+            const words = readFileSync(
+                path.resolve(LanguagesDir, this.data.words),
+                "utf-8"
+            )
+                .split("\n")
+                .map((word) => word.trim())
+                .filter((word, index, arr) => {
+                    // If the word length is invalid
+                    if (word.length !== 5) {
+                        App.Instance().logger.warn("word %s has a length different than 5", word);
+                        return false;
+                    }
 
-                // If the word is repeated
-                if (arr.indexOf(word) !== index) {
-                    App.Instance().logger.warn("word %s is repeated", word);
-                    return false;
-                }
+                    // If the word is repeated
+                    if (arr.indexOf(word) !== index) {
+                        App.Instance().logger.warn("word %s is repeated", word);
+                        return false;
+                    }
 
-                return true;
-            })
+                    return true;
+                });
+
+            this.words = words.map(w => {
+                return {
+                    word: w.replace(/ /g, "")
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .toLowerCase(),
+                    originalWord: w,
+                    difficulty: 5
+                };
+            });
+
+            // Save an updated JSON version to the disk
+            writeFileSync(LanguagesDir + "/dictionary/pt_BR.json", JSON.stringify(this.words, null, "\t"));
+        }
+
+        return Promise.resolve(this.data);
     }
 
     /**
@@ -90,7 +155,7 @@ export default class Language {
      * @returns 
      */
     public isWordPresent(word: string) {
-        return this.words.includes(word);
+        return this.words.some((w) => w.word === word);
     }
 
     /**
@@ -112,7 +177,7 @@ export default class Language {
      * Retrieves a random word from this language dictionary
      * @returns 
      */
-    public getRandomWord(): string {
+    public getRandomWord(): LanguageWord {
         return this.words[Math.round(Math.random() * this.words.length)];
     }
 
@@ -120,7 +185,7 @@ export default class Language {
      * Retrieves the daily word from this language dictionary
      * @returns
      */
-    public getDailyWord(): string {
+    public getDailyWord(): LanguageWord {
         const prng = rng(new Date().toDateString());
         return this.words[Math.floor(prng() * (this.words.length - 1))];
     }
