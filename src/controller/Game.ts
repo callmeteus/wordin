@@ -1,7 +1,7 @@
 import App, { AppBotContext } from "./App";
 import GameModel from "../model/Game";
 import Chat from "./tables/Chat";
-import { Extra } from "telegraf";
+import { Middleware } from "telegraf";
 import SettingsMenuController from "./bot/telegram/menus/SettingsMenu";
 
 const games: Record<number, GameModel> = {};
@@ -15,26 +15,23 @@ export function hasGameFor(chat: number) {
  * @param context The telegraf context
  * @param next Callback
  */
-export function GetChatForContext(initializeLanguage?: boolean) {
-    return async (context: AppBotContext, next: (context: AppBotContext) => any) => {
-        context.replyWithChatAction("typing");
+export function GetChatForContext(): Middleware<AppBotContext> {
+    return async (context, next) => {
+        await context.replyWithChatAction("typing");
 
+        // Retrieve the chat related to this context
         context.relatedChat = await Chat.getOrCreateExternal(context.chat.id, "telegram");
 
-        if (initializeLanguage) {
-            await context.relatedChat.initializeLanguage();
-        }
-
-        next(context);
+        next();
     };
 }
 
-export default function GameController(app: App) {
+export default async function GameController(app: App) {
     // Call the settings menu controller
-    SettingsMenuController(app);
+    await SettingsMenuController(app);
 
     // When the "start" command is issued
-    app.bot.command("start", GetChatForContext(true), async (context) => {
+    app.bot.command("start", GetChatForContext(), async (context) => {
         // If chat already has a running game
         if (hasGameFor(context.relatedChat.id)) {
             return context.replyWithHTML(context.relatedChat.getLanguage().getMessage("game.error.already_running"));
@@ -45,14 +42,14 @@ export default function GameController(app: App) {
     });
 
     // When the "help" command is issued
-    app.bot.command("help", GetChatForContext(true), (context) => {
+    app.bot.command("help", GetChatForContext(), (context) => {
         context.replyWithHTML(
             context.relatedChat.getLanguage().getMessage("help")
         );
     });
 
     // When any text message is received
-    app.bot.on("text", GetChatForContext(true), async (context) => {
+    app.bot.on("text", GetChatForContext(), async (context) => {
         // If has no game for this chat
         if (!hasGameFor(context.relatedChat.id)) {
             return;

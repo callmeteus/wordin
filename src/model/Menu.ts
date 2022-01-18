@@ -1,6 +1,8 @@
 import { AppBotContext } from "../controller/App";
 
-import { OptionTypes, OptionalLanguageText } from "./Menu.d";
+import { OptionTypes, OptionalLanguageText, SelectOptionType } from "./Menu.d";
+
+export { SelectOptionType };
 
 export class MenuOption<T extends MenuModel> {
     public static LANGUAGE_MESSAGE(message: string): Symbol {

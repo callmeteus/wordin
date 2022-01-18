@@ -6,7 +6,7 @@ import rng from "seedrandom";
 import App from "../controller/App";
 import LanguageTable from "../controller/tables/Language";
 
-const LanguagesDir = path.resolve(__dirname, "../data/languages");
+export const LanguagesDir = path.resolve(__dirname, "../data/languages");
 
 /**
  * Represents a word inside a dictionary
@@ -64,11 +64,18 @@ export default class Language {
      * Initializes the language
      * @returns 
      */
-    public init() {
-        return LanguageTable.findOne({
-            where: {
-                id: ""
+    public init(data?: LanguageTable) {
+        return new Promise<LanguageTable>((resolve) => {
+            if (data) {
+                return resolve(data);
             }
+
+            return LanguageTable.findOne({
+                where: {
+                    id: this.code
+                }
+            })
+            .then(resolve);
         })
         .then((data) => {
             if (!data) {

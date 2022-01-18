@@ -1,8 +1,8 @@
 import type MenuModel from "./Menu";
 
-type DefaultOptionTypes = "submenu" | "back" | "firstpage";
-
-type OptionalLanguageText = string | Symbol;
+declare type DefaultOptionTypes = "submenu" | "back" | "firstpage";
+ 
+declare type OptionalLanguageText = string | Symbol;
 
 /**
  * Represents an option type
@@ -35,28 +35,28 @@ interface OptionTypeWithGetterAndSetter<
 /**
  * Represents the toggle option type
  */
-interface ToggleOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, boolean> {
+declare interface ToggleOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, boolean> {
     type: "toggle"
 }
 
 /**
  * Represents the text input option type
  */
-interface TextOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, string> {
+declare interface TextOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, string> {
     type: "text"
 }
 
 /**
  * Represents the number input option type
  */
-interface NumberOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, number> {
+declare interface NumberOptionType<TMenu extends MenuModel> extends OptionTypeWithGetterAndSetter<TMenu, number> {
     type: "number"
 }
 
 /**
  * Represents the selection option type
  */
-interface SelectOptionType<TMenu extends MenuModel, TType extends string | number> extends OptionTypeWithGetterAndSetter<TMenu, TType> {
+declare interface SelectOptionType<TMenu extends MenuModel, TType extends string | number> extends OptionTypeWithGetterAndSetter<TMenu, TType> {
     type: "select",
     options: {
         text: string,
@@ -64,4 +64,4 @@ interface SelectOptionType<TMenu extends MenuModel, TType extends string | numbe
     }[]
 }
 
-type OptionTypes<TMenu extends MenuModel> = ToggleOptionType<TMenu> | TextOptionType<TMenu> | NumberOptionType<TMenu> | SelectOptionType<TMenu, any>;
+declare type OptionTypes<TMenu extends MenuModel> = ToggleOptionType<TMenu> | TextOptionType<TMenu> | NumberOptionType<TMenu> | SelectOptionType<TMenu, any>;

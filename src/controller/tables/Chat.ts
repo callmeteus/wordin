@@ -1,5 +1,6 @@
 import { BelongsTo, Column, DataType, Default, ForeignKey, HasOne, Model, Table } from "sequelize-typescript";
 import Language from "../../model/Language";
+import App from "../App";
 import LanguageTable from "./Language";
 
 type ChatSources = "telegram" | "discord";
@@ -80,20 +81,10 @@ export default class Chat extends Model {
     }
 
     /**
-     * The language instance for this table
+     * Retrieves the language related to this chat
+     * @returns 
      */
-    private languageInstance: Language = null;
-
-    public async initializeLanguage() {
-        if (this.languageInstance === null) {
-            this.languageInstance = new Language(this.languageId);
-            await this.languageInstance.init();
-        }
-
-        return this.languageInstance;
-    }
-
     public getLanguage() {
-        return this.languageInstance;
+        return App.Instance().languages[this.languageId.length ? this.languageId : "pt_BR"];
     }
 };

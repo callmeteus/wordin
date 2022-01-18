@@ -8,6 +8,9 @@ import EditorController from "./Editor";
 import Database from "./Database";
 import BotSettingsTable from "./tables/BotSettings";
 import Chat from "./tables/Chat";
+import Language, { LanguagesDir } from "../model/Language";
+import LanguageTable from "./tables/Language";
+import { readdirSync, readFileSync, statSync } from "fs";
 
 export interface AppBotContext extends Context {
     getMessage(): string,
@@ -61,6 +64,11 @@ export default class App {
          */
         modAccounts?: string[]
     } = {};
+
+    /**
+     * All available languages
+     */
+    public languages: Record<string, Language>;
 
     public logger = createLogger({
         level: this.debug ? "debug" : "info",
@@ -216,7 +224,32 @@ export default class App {
 
             this.logger.debug("application settings were updated: %O", this.settings);
 
-            return true;
+            return LanguageTable.findAll();
+        })
+        .then(async (languages) => {
+            // Clear the current language instances
+            this.languages = {};
+
+            for(let language of languages) {
+                this.languages[language.id] = new Language(language.id);
+                await this.languages[language.id].init(language);
+            }
+
+            // Also load the local languages
+            for(let dir of readdirSync(LanguagesDir)) {
+                const stat = statSync(LanguagesDir + "/" + dir);
+
+                if (stat.isDirectory()) {
+                    continue;
+                }
+
+                const id = dir.replace(".json", "");
+                this.languages[id] = new Language(id);
+
+                await this.languages[id].init();
+            }
+
+            this.logger.debug("%d language(s) were loaded", Object.keys(this.languages).length);
         });
     }
 }
